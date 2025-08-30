@@ -1,1 +1,4 @@
-
+Computer Science is the study of computers and computational systems. It covers both software and hardware aspects. 
+Key areas of computer science include programming, algorithms, data structures, databases, and networking. 
+Programming languages such as Python, C++, and Java are widely used. 
+Artificial Intelligence (AI) and Machine Learning (ML) are subfields of computer science that focus on making computers learn from data.

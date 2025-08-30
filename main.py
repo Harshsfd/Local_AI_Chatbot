@@ -62,4 +62,4 @@ for speaker, text in st.session_state.history:
     if speaker == "You":
         st.markdown(f"**You:** {text}")
     else:
-        st.markdown(f"**Bot:** {text
+        st.markdown(f"**Bot:** {text}")

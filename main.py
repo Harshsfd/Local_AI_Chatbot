@@ -4,47 +4,45 @@ import faiss
 import numpy as np
 import os
 
-st.set_page_config(page_title="Local AI Chatbot", page_icon="🤖")
+st.set_page_config(page_title="Local AI Chatbot", page_icon="🤖", layout="wide")
 
-st.title("Local AI Chatbot 🌟")
-st.write("Ask questions based on your local text files!")
+st.markdown("""
+    <h1 style='text-align:center;'>🤖 Local AI Chatbot</h1>
+    <p style='text-align:center;'>Ask questions based on your local text files!</p>
+""", unsafe_allow_html=True)
 
-# Load embedding model
+# ------------------ Load Embedding Model ------------------
 @st.cache_resource
 def load_embedding_model():
     return SentenceTransformer('all-MiniLM-L6-v2')
 
 embed_model = load_embedding_model()
 
-# Load local data files and split into sentences
+# ------------------ Load & Chunk Text Data ------------------
 texts = []
 data_folder = 'data'
 for file in os.listdir(data_folder):
     if file.endswith('.txt'):
         with open(os.path.join(data_folder, file), 'r', encoding='utf-8') as f:
             content = f.read()
+            # Split into sentences for better FAISS retrieval
             sentences = [s.strip() for s in content.split('.') if s.strip()]
             texts.extend(sentences)
 
-# Generate embeddings and build FAISS index
+# ------------------ Build FAISS Index ------------------
 embeddings = embed_model.encode(texts)
 dim = embeddings.shape[1]
 index = faiss.IndexFlatL2(dim)
 index.add(np.array(embeddings, dtype=np.float32))
 
-# Initialize session state for conversation history
+# ------------------ Session State ------------------
 if 'history' not in st.session_state:
     st.session_state.history = []
 
-# User input
-query = st.text_input("Your question:", key="query")
-
+# ------------------ Factual Answer Extraction ------------------
 def extract_answer(query, context):
-    """Simple rule-based extraction for factual questions"""
     query_lower = query.lower()
     context_lower = context.lower()
-
-    # Check if query keywords are in context
     if "capital" in query_lower and "capital" in context_lower:
         for sentence in context.split('.'):
             if "capital" in sentence.lower():
@@ -53,28 +51,51 @@ def extract_answer(query, context):
         for sentence in context.split('.'):
             if "states" in sentence.lower():
                 return sentence.strip()
+    elif any(keyword in query_lower for keyword in ["languages", "official language"]):
+        for sentence in context.split('.'):
+            if "language" in sentence.lower():
+                return sentence.strip()
+    elif any(keyword in query_lower for keyword in ["festival", "celebration"]):
+        for sentence in context.split('.'):
+            if "festival" in sentence.lower() or "celebration" in sentence.lower():
+                return sentence.strip()
     else:
-        # Default: return full context
         return context.strip()
     return "Sorry, I could not find the answer in my data."
 
-if st.button("Ask") and query:
-    # Embed query and search FAISS index
-    query_emb = embed_model.encode([query])
-    D, I = index.search(np.array(query_emb, dtype=np.float32), k=1)
-    context = texts[I[0][0]]
+# ------------------ User Input ------------------
+with st.form(key="chat_form", clear_on_submit=True):
+    user_input = st.text_input("Type your question here:", "")
+    submit_button = st.form_submit_button("Ask")
 
-    # Extract precise answer
-    answer = extract_answer(query, context)
+if submit_button and user_input:
+    with st.spinner("Processing your question..."):
+        # Embed user query
+        query_emb = embed_model.encode([user_input])
+        D, I = index.search(np.array(query_emb, dtype=np.float32), k=3)  # top-3 relevant sentences
+        context = " ".join([texts[i] for i in I[0]])
 
-    # Save conversation in session state
-    st.session_state.history.append(("You", query))
-    st.session_state.history.append(("Bot", answer))
+        # Extract accurate answer
+        answer = extract_answer(user_input, context)
 
-# Display conversation
-for speaker, text in st.session_state.history:
-    if speaker == "You":
-        st.markdown(f"**You:** {text}")
-    else:
-        st.markdown(f"**Bot:** {text}")
-        
+        # Save conversation in session
+        st.session_state.history.append(("You", user_input))
+        st.session_state.history.append(("Bot", answer))
+
+# ------------------ Display Chat ------------------
+chat_container = st.container()
+with chat_container:
+    for speaker, text in st.session_state.history:
+        if speaker == "You":
+            st.markdown(f"""
+                <div style="text-align: right; margin:10px;">
+                    <span style="background-color:#DCF8C6; padding:10px; border-radius:10px; display:inline-block;">**You:** {text}</span>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+                <div style="text-align: left; margin:10px;">
+                    <span style="background-color:#F1F0F0; padding:10px; border-radius:10px; display:inline-block;">**Bot:** {text}</span>
+                </div>
+            """, unsafe_allow_html=True)
+            

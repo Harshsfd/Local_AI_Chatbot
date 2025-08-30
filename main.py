@@ -10,7 +10,7 @@ st.set_page_config(page_title="Local AI Chatbot", page_icon="🤖")
 st.title("Local AI Chatbot 🌟")
 st.write("Ask questions based on your local text files!")
 
-# Load models (cache to avoid reloading on each interaction)
+# Load models (cache to avoid reloading)
 @st.cache_resource
 def load_models():
     embed_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -47,10 +47,22 @@ if st.button("Ask") and query:
     D, I = index.search(np.array(query_emb, dtype=np.float32), k=1)
     context = texts[I[0][0]]
 
-    # Generate response using GPT-2
-    input_text = f"Context: {context}\nQuestion: {query}\nAnswer:"
+    # Generate GPT-2 response with better prompt and sampling
+    input_text = f"""
+You are a helpful AI assistant. Answer the question clearly based on the given context.
+Context: {context}
+Question: {query}
+Answer:"""
+    
     inputs = tokenizer.encode(input_text, return_tensors='pt')
-    outputs = gpt_model.generate(inputs, max_length=150)
+    outputs = gpt_model.generate(
+        inputs,
+        max_length=150,
+        do_sample=True,      # allows randomness
+        top_p=0.9,           # nucleus sampling
+        temperature=0.7,     # creativity in responses
+        pad_token_id=tokenizer.eos_token_id
+    )
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     # Save conversation in session state
@@ -63,3 +75,4 @@ for speaker, text in st.session_state.history:
         st.markdown(f"**You:** {text}")
     else:
         st.markdown(f"**Bot:** {text}")
+        

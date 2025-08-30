@@ -5,7 +5,12 @@ import numpy as np
 import os
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
-# Load models
+st.set_page_config(page_title="Local AI Chatbot", page_icon="🤖")
+
+st.title("Local AI Chatbot 🌟")
+st.write("Ask questions based on your local text files!")
+
+# Load models (cache to avoid reloading on each interaction)
 @st.cache_resource
 def load_models():
     embed_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -15,7 +20,7 @@ def load_models():
 
 embed_model, tokenizer, gpt_model = load_models()
 
-# Load data
+# Load local data files
 texts = []
 data_folder = 'data'
 for file in os.listdir(data_folder):
@@ -23,25 +28,38 @@ for file in os.listdir(data_folder):
         with open(os.path.join(data_folder, file), 'r', encoding='utf-8') as f:
             texts.append(f.read())
 
-# Load FAISS index
-index = faiss.read_index("embeddings/index.faiss")
+# Generate embeddings and build FAISS index
+embeddings = embed_model.encode(texts)
+dim = embeddings.shape[1]
+index = faiss.IndexFlatL2(dim)
+index.add(np.array(embeddings, dtype=np.float32))
 
-# Streamlit UI
-st.title("Local AI Chatbot 🌟")
-st.write("Ask questions based on your local data files!")
+# Initialize session state for conversation history
+if 'history' not in st.session_state:
+    st.session_state.history = []
 
-query = st.text_input("Your question:")
+# User input
+query = st.text_input("Your question:", key="query")
 
 if st.button("Ask") and query:
     # Embed query
     query_emb = embed_model.encode([query])
     D, I = index.search(np.array(query_emb, dtype=np.float32), k=1)
     context = texts[I[0][0]]
-    
-    # Generate GPT-2 response
+
+    # Generate response using GPT-2
     input_text = f"Context: {context}\nQuestion: {query}\nAnswer:"
     inputs = tokenizer.encode(input_text, return_tensors='pt')
     outputs = gpt_model.generate(inputs, max_length=150)
     response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
-    st.write("**Bot:**", response)
+
+    # Save conversation in session state
+    st.session_state.history.append(("You", query))
+    st.session_state.history.append(("Bot", response))
+
+# Display conversation
+for speaker, text in st.session_state.history:
+    if speaker == "You":
+        st.markdown(f"**You:** {text}")
+    else:
+        st.markdown(f"**Bot:** {text

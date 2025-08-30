@@ -1,6 +1,8 @@
-torch
-transformers
-sentence-transformers
-faiss-cpu
-numpy
-streamlit
+streamlit==1.29.0
+sentence-transformers==2.2.2
+faiss-cpu==1.7.4
+numpy==1.26.5
+openai==0.28.0
+python-docx==0.8.12
+PyPDF2==3.1.0             
+pandas==2.1.0        
